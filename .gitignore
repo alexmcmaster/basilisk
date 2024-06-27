@@ -1,6 +1,7 @@
 .eggs/
 CMakeFiles/
 **/_VizFiles/
+vizard/
 CMakeCache.txt
 .DS_Store
 dist/
