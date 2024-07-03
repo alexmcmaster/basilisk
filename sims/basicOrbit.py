@@ -4,6 +4,7 @@ Simulation of an uncontrolled spacecraft in LEO.
 
 import os
 import time
+import subprocess
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -23,6 +24,9 @@ TIME_STEP_S = 0.05
 
 
 if __name__ == "__main__":
+    # Spin off visualization process
+    vizard = subprocess.Popen(["vizard/Vizard.x86_64", "--args", "-directComm", "tcp://localhost:5556"], stdout=subprocess.DEVNULL)
+
     # Sim setup
     simTaskName = "simTask"
     simProcessName = "simProcess"
@@ -86,6 +90,7 @@ if __name__ == "__main__":
     t0 = time.time()
     scSim.ExecuteSimulation()
     print(f"Simulation complete after {time.time() - t0:0.1f} seconds.")
+    vizard.kill()
 
     # Plot results
     posData = dataLog.r_BN_N
