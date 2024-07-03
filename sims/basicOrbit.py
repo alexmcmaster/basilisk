@@ -16,6 +16,7 @@ from Basilisk.simulation import spacecraft
 from Basilisk.utilities import SimulationBaseClass, macros,\
     orbitalMotion, simIncludeGravBody, unitTestSupport, vizSupport
 from Basilisk.simulation import simSynch
+from Basilisk.architecture import messaging
 
 
 TIME_STEP_S = 0.05
@@ -34,13 +35,18 @@ if __name__ == "__main__":
     scSim.AddModelToTask(simTaskName, scObject)
 
     # Gravity setup
-    gravFactory = simIncludeGravBody.gravBodyFactory()
-    planet = gravFactory.createEarth()
-    planet.isCentralBody = True
-    planet.useSphericalHarmonicsGravityModel(
-        bskPath + '/supportData/LocalGravData/GGM03S-J2-only.txt', 2)
-    mu = planet.mu
-    gravFactory.addBodiesTo(scObject)
+    grav_factory = simIncludeGravBody.gravBodyFactory()
+    grav_bodies = grav_factory.createBodies("earth", "moon")
+    grav_bodies["earth"].isCentralBody = True
+    grav_bodies["earth"].useSphericalHarmonicsGravityModel(bskPath + "/supportData/LocalGravData/GGM03S.txt", 100)
+    mu_earth = grav_bodies["earth"].mu
+    mu = mu_earth
+    grav_factory.addBodiesTo(scObject)
+    spice_object = grav_factory.createSpiceInterface(time="2012 MAY 1 00:28:30.0 TDB", epochInMsg=True)
+    spice_object.zeroBase = "Earth"
+    spice_object.addPlanetNames(messaging.StringVector(["EARTH", "MOON"]))
+    spice_object.loadSpiceKernel("de421.bsp", bskPath + "/supportData/EphemerisData/")
+    scSim.AddModelToTask(simTaskName, spice_object)
 
     # Initial conditions
     oe = orbitalMotion.ClassicElements()
