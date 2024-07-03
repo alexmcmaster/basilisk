@@ -36,7 +36,7 @@ if __name__ == "__main__":
 
     # Gravity setup
     grav_factory = simIncludeGravBody.gravBodyFactory()
-    grav_bodies = grav_factory.createBodies("earth", "moon")
+    grav_bodies = grav_factory.createBodies("earth", "moon", "sun")
     grav_bodies["earth"].isCentralBody = True
     grav_bodies["earth"].useSphericalHarmonicsGravityModel(bskPath + "/supportData/LocalGravData/GGM03S.txt", 100)
     mu_earth = grav_bodies["earth"].mu
@@ -44,7 +44,7 @@ if __name__ == "__main__":
     grav_factory.addBodiesTo(scObject)
     spice_object = grav_factory.createSpiceInterface(time="2012 MAY 1 00:28:30.0 TDB", epochInMsg=True)
     spice_object.zeroBase = "Earth"
-    spice_object.addPlanetNames(messaging.StringVector(["EARTH", "MOON"]))
+    spice_object.addPlanetNames(messaging.StringVector(["EARTH", "MOON", "SUN"]))
     spice_object.loadSpiceKernel("de421.bsp", bskPath + "/supportData/EphemerisData/")
     scSim.AddModelToTask(simTaskName, spice_object)
 
