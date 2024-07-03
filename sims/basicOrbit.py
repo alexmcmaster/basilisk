@@ -18,7 +18,7 @@ from Basilisk.utilities import SimulationBaseClass, macros,\
 from Basilisk.simulation import simSynch
 
 
-TIME_STEP_S = 1.0
+TIME_STEP_S = 0.05
 
 
 if __name__ == "__main__":
@@ -56,7 +56,7 @@ if __name__ == "__main__":
     scObject.hub.v_CN_NInit = vN  # meters per second
     n = np.sqrt(mu / oe.a / oe.a / oe.a)
     P = 2. * np.pi / n
-    simulationTime = macros.sec2nano(P)  # Run for 1 orbit
+    simulationTime = macros.sec2nano(P/100)  # Run for 1/100 of an orbit
 
     # Logging
     numDataPoints = 400
@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
     # Final setup
     clockSync = simSynch.ClockSynch()
-    clockSync.accelFactor = 50.0
+    clockSync.accelFactor = 1.0
     scSim.AddModelToTask(simTaskName, clockSync)
     vizSupport.enableUnityVisualization(scSim, simTaskName, scObject,
                                         liveStream=True)
