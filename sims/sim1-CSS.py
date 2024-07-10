@@ -105,17 +105,17 @@ if __name__ == "__main__":
         CSS.nHat_B = np.array(direction)
 
     CSS0 = coarseSunSensor.CoarseSunSensor()
-    setupCSS(CSS0, "CSS0_sensor", [0, 0, 0], [1, 0, 0])
+    setupCSS(CSS0, "CSS0_sensor", [1, 0, 0], [1, 0, 0])
     CSS1 = coarseSunSensor.CoarseSunSensor()
-    setupCSS(CSS1, "CSS1_sensor", [0, 0, 0], [-1, 0, 0])
+    setupCSS(CSS1, "CSS1_sensor", [-1, 0, 0], [-1, 0, 0])
     CSS2 = coarseSunSensor.CoarseSunSensor()
-    setupCSS(CSS2, "CSS2_sensor", [0, 0, 0], [0, 1, 0])
+    setupCSS(CSS2, "CSS2_sensor", [0, 1, 0], [0, 1, 0])
     CSS3 = coarseSunSensor.CoarseSunSensor()
-    setupCSS(CSS3, "CSS3_sensor", [0, 0, 0], [0, -1, 0])
+    setupCSS(CSS3, "CSS3_sensor", [0, -1, 0], [0, -1, 0])
     CSS4 = coarseSunSensor.CoarseSunSensor()
-    setupCSS(CSS4, "CSS4_sensor", [0, 0, 0], [0, 0, 1])
+    setupCSS(CSS4, "CSS4_sensor", [0, 0, 1], [0, 0, 1])
     CSS5 = coarseSunSensor.CoarseSunSensor()
-    setupCSS(CSS5, "CSS5_sensor", [0, 0, 0], [0, 0, -1])
+    setupCSS(CSS5, "CSS5_sensor", [0, 0, -1], [0, 0, -1])
     cssList = [CSS0, CSS1, CSS2, CSS3, CSS4, CSS5]
 
     # Add CSS units to sim
