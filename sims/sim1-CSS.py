@@ -166,12 +166,12 @@ if __name__ == "__main__":
     ax = fig.gca()
     ax.ticklabel_format(useOffset=False, style='plain')
     for idx in range(3):
-        plt.plot(dataLog.times() * macros.NANO2SEC / P, posData[:, idx] / 1000.,
+        plt.plot(dataLog.times() * macros.NANO2SEC, posData[:, idx] / 1000.,
                  color=unitTestSupport.getLineColor(idx, 3),
                  label='$r_{BN,' + str(idx) + '}$')
     plt.legend(loc='lower right')
-    plt.xlabel('Time [orbits]')
-    plt.ylabel('Inertial Position [km]')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Inertial Position (km)')
 
     plt.figure(2)
     fig = plt.gcf()
@@ -181,19 +181,19 @@ if __name__ == "__main__":
     for idx in range(0, len(posData)):
         oeData = orbitalMotion.rv2elem(mu, posData[idx], velData[idx])
         smaData.append(oeData.a / 1000.)
-    plt.plot(posData[:, 0] * macros.NANO2SEC / P, smaData, color='#aa0000')
-    plt.xlabel('Time [orbits]')
-    plt.ylabel('SMA [km]')
+    plt.plot(posData[:, 0] * macros.NANO2SEC, smaData, color='#aa0000')
+    plt.xlabel('Time (s)')
+    plt.ylabel('SMA (km)')
 
     plt.figure(3)
     fig = plt.gcf()
     ax = fig.gca()
     ax.ticklabel_format(useOffset=False, style='plain')
     for i, cssl in enumerate(cssLogs):
-        plt.plot(cssl.times() * macros.NANO2SEC / P, cssl.OutputData,
+        plt.plot(cssl.times() * macros.NANO2SEC, cssl.OutputData,
                  label=f"CSS{i}")
     plt.legend()
-    plt.xlabel('Time [orbits]')
+    plt.xlabel('Time (s)')
     plt.ylabel('CSS readings')
 
     plt.show()
