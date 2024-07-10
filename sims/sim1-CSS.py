@@ -97,6 +97,8 @@ if __name__ == "__main__":
         CSS.maxOutput = 2.0
         CSS.minOutput = 0.5
         CSS.kellyFactor = 0.2
+        CSS.senBias = 0.0  # normalized sensor bias
+        CSS.senNoiseStd = 0.01  # normalized sensor noise
         CSS.sunInMsg.subscribeTo(sunPositionMsg)
         CSS.stateInMsg.subscribeTo(scObject.scStateOutMsg)
         CSS.sunEclipseInMsg.subscribeTo(eclipseMsg)
@@ -194,7 +196,7 @@ if __name__ == "__main__":
                  label=f"CSS{i}")
     plt.legend()
     plt.xlabel('Time (s)')
-    plt.ylabel('CSS readings')
+    plt.ylabel('CSS readings (mA)')
 
     plt.show()
     plt.close("all")
