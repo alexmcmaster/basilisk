@@ -52,7 +52,15 @@ if __name__ == "__main__":
     spice_object.loadSpiceKernel("de421.bsp", bskPath + "/supportData/EphemerisData/")
     scSim.AddModelToTask(simTaskName, spice_object)
 
-    # Initial conditions
+    # Spacecraft setup
+    I = [900., 0., 0.,
+         0., 800., 0.,
+         0., 0., 600.]
+    scObject.hub.mHub = 750.0  # spacecraft mass (kg)
+    scObject.hub.r_BcB_B = [[0.0], [0.0], [0.0]]  # position vector of body-fixed point B relative to CM (m)
+    scObject.hub.IHubPntBc_B = unitTestSupport.np2EigenMatrix3d(I)
+
+    # Initial orbit conditions
     oe = orbitalMotion.ClassicElements()
     oe.a = 7e6  # meters
     oe.e = 0.0001
@@ -62,11 +70,17 @@ if __name__ == "__main__":
     oe.f = 85.3 * macros.D2R
     rN, vN = orbitalMotion.elem2rv(mu, oe)
     oe = orbitalMotion.rv2elem(mu, rN, vN)
-    scObject.hub.r_CN_NInit = rN  # meters
-    scObject.hub.v_CN_NInit = vN  # meters per second
     n = np.sqrt(mu / oe.a / oe.a / oe.a)
     P = 2. * np.pi / n
     simulationTime = macros.sec2nano(P/100)  # Run for 1/100 of an orbit
+
+    # Initial spacecraft states/rates
+    scObject.hub.r_CN_NInit = rN  # position vector (m)
+    scObject.hub.v_CN_NInit = vN  # velocity vector (m/s)
+    scObject.hub.sigma_BNInit = [[0.0], [0.0], [0.0]]  # attitude MRP
+    scObject.hub.omega_BN_BInit = [[1.*macros.D2R],
+                                   [2.*macros.D2R],
+                                   [3.*macros.D2R]]  # angular rates (rad/s)
 
     # Logging
     numDataPoints = 400
