@@ -42,7 +42,7 @@ if __name__ == "__main__":
     grav_factory = simIncludeGravBody.gravBodyFactory()
     grav_bodies = grav_factory.createBodies("earth", "moon", "sun")
     grav_bodies["earth"].isCentralBody = True
-    grav_bodies["earth"].useSphericalHarmonicsGravityModel(bskPath + "/supportData/LocalGravData/GGM03S.txt", 100)
+    grav_bodies["earth"].useSphericalHarmonicsGravityModel(bskPath + "/supportData/LocalGravData/GGM03S.txt", 10)
     mu_earth = grav_bodies["earth"].mu
     mu = mu_earth
     grav_factory.addBodiesTo(scObject)
