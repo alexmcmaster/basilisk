@@ -4,6 +4,7 @@ Simulation of an uncontrolled spacecraft in LEO.
 
 import os
 import time
+from datetime import datetime
 import subprocess
 
 import matplotlib.pyplot as plt
@@ -13,14 +14,22 @@ from Basilisk import __path__
 bskPath = __path__[0]
 fileName = os.path.basename(os.path.splitext(__file__)[0])
 
-from Basilisk.simulation import spacecraft, coarseSunSensor
+from Basilisk.simulation import spacecraft, simSynch, coarseSunSensor,\
+    magnetometer, magneticFieldWMM, magneticFieldCenteredDipole
 from Basilisk.utilities import SimulationBaseClass, macros,\
-    orbitalMotion, simIncludeGravBody, unitTestSupport, vizSupport
+    orbitalMotion, simIncludeGravBody, unitTestSupport, vizSupport,\
+    simSetPlanetEnvironment
 from Basilisk.simulation import simSynch
 from Basilisk.architecture import messaging
+from Basilisk.topLevelModules import pyswice
+from Basilisk.utilities.pyswice_spk_utilities import spkRead
 
 
-TIME_STEP_S = 0.05
+TIME_STEP_S = 5
+ACCEL_FACTOR = 100.0
+SPICE_TIME = "2012 MAY 1 00:28:30.0 TDB"
+START_TIME = datetime(year=2012, month=5, day=1, hour=0, minute=28, second=30)
+NUM_ORBITS = 0.1
 
 
 if __name__ == "__main__":
@@ -46,11 +55,33 @@ if __name__ == "__main__":
     mu_earth = grav_bodies["earth"].mu
     mu = mu_earth
     grav_factory.addBodiesTo(scObject)
-    spice_object = grav_factory.createSpiceInterface(time="2012 MAY 1 00:28:30.0 TDB", epochInMsg=True)
-    spice_object.zeroBase = "Earth"
-    spice_object.addPlanetNames(messaging.StringVector(["EARTH", "MOON", "SUN"]))
-    spice_object.loadSpiceKernel("de421.bsp", bskPath + "/supportData/EphemerisData/")
-    scSim.AddModelToTask(simTaskName, spice_object)
+    spice_time = START_TIME.strftime("%Y %b %d %X TDB")
+    grav_factory.createSpiceInterface(bskPath + "/supportData/EphemerisData/",
+        time=spice_time, epochInMsg=True)
+    grav_factory.spiceObject.zeroBase = "Earth"
+    grav_factory.spiceObject.addPlanetNames(messaging.StringVector(["EARTH", "MOON", "SUN"]))
+    ret = grav_factory.spiceObject.loadSpiceKernel("de421.bsp", bskPath + "/supportData/EphemerisData/")
+    if ret:
+        print("Failed to load spice kernel")
+    scSim.AddModelToTask(simTaskName, grav_factory.spiceObject)
+    pyswice.furnsh_c(grav_factory.spiceObject.SPICEDataPath + 'de430.bsp')  # solar system bodies
+    pyswice.furnsh_c(grav_factory.spiceObject.SPICEDataPath + 'naif0012.tls')  # leap second file
+    pyswice.furnsh_c(grav_factory.spiceObject.SPICEDataPath + 'de-403-masses.tpc')  # solar system masses
+    pyswice.furnsh_c(grav_factory.spiceObject.SPICEDataPath + 'pck00010.tpc')  # generic Planetary Constants Kernel
+
+    # Magnetic field model
+    #magModule = magneticFieldWMM.MagneticFieldWMM()
+    #magModule.ModelTag = "WMM"
+    #magModule.dataPath = bskPath + "/supportData/MagneticField/"
+    magModule = magneticFieldCenteredDipole.MagneticFieldCenteredDipole()
+    magModule.ModelTag = "CenteredDipole"
+    magModule.planetPosInMsg.subscribeTo(grav_factory.spiceObject.planetStateOutMsgs[0])
+    epochMsg = unitTestSupport.timeStringToGregorianUTCMsg(
+        START_TIME.strftime("%Y %b %d, %X (UTC)"))
+    magModule.epochInMsg.subscribeTo(epochMsg)
+    simSetPlanetEnvironment.centeredDipoleMagField(magModule, "earth")
+    magModule.addSpacecraftToModel(scObject.scStateOutMsg)
+    scSim.AddModelToTask(simTaskName, magModule)
 
     # Spacecraft setup
     I = [900., 0., 0.,
@@ -62,7 +93,7 @@ if __name__ == "__main__":
 
     # Initial orbit conditions
     oe = orbitalMotion.ClassicElements()
-    oe.a = 7e6  # meters
+    oe.a = 700 * 1e3 + 6.371e6  # meters
     oe.e = 0.0001
     oe.i = 33.3 * macros.D2R
     oe.Omega = 48.2 * macros.D2R
@@ -72,7 +103,7 @@ if __name__ == "__main__":
     oe = orbitalMotion.rv2elem(mu, rN, vN)
     n = np.sqrt(mu / oe.a / oe.a / oe.a)
     P = 2. * np.pi / n
-    simulationTime = macros.sec2nano(P/100)  # Run for 1/100 of an orbit
+    simulationTime = macros.sec2nano(P * NUM_ORBITS)
 
     # Initial spacecraft states/rates
     scObject.hub.r_CN_NInit = rN  # position vector (m)
@@ -124,31 +155,46 @@ if __name__ == "__main__":
     for css in cssList:
         scSim.AddModelToTask(simTaskName, css)
 
+    # Three-Axis Magnetometer (TAM)
+    TAM = magnetometer.Magnetometer()
+    TAM.ModelTag = "TAM_sensor"
+    TAM.scaleFactor = 1.0
+    #TAM.senNoiseStd = [100e-9, 100e-9, 100e-9]
+    TAM.stateInMsg.subscribeTo(scObject.scStateOutMsg)
+    scSim.AddModelToTask(simTaskName, TAM)
+
     # Logging
     numDataPoints = 400
     samplingTime = unitTestSupport.samplingTime(simulationTime,
                                                 simulationTimeStep,
                                                 numDataPoints)
     dataLog = scObject.scStateOutMsg.recorder(samplingTime)
+    cssLogs = [css.cssDataOutMsg.recorder(samplingTime) for css in cssList]
+    tamLog = TAM.tamDataOutMsg.recorder(samplingTime)
+    magLog = magModule.envOutMsgs[0].recorder(samplingTime)
+    earthLog = grav_factory.spiceObject.planetStateOutMsgs[0].recorder(samplingTime)
     scSim.AddModelToTask(simTaskName, dataLog)
-    cssLogs = [css.cssDataOutMsg.recorder() for css in cssList]
     for cssl in cssLogs:
         scSim.AddModelToTask(simTaskName, cssl)
+    scSim.AddModelToTask(simTaskName, tamLog)
+    scSim.AddModelToTask(simTaskName, magLog)
+    TAM.magInMsg.subscribeTo(magModule.envOutMsgs[0])
 
     # Final setup
     clockSync = simSynch.ClockSynch()
-    clockSync.accelFactor = 1.0
+    clockSync.accelFactor = ACCEL_FACTOR
     scSim.AddModelToTask(simTaskName, clockSync)
     viz = vizSupport.enableUnityVisualization(scSim, simTaskName, scObject,
                                               liveStream=True,
                                               cssList=[cssList])
-    vizSupport.setInstrumentGuiSetting(viz, viewCSSPanel=True,
-                                       viewCSSCoverage=True,
-                                       viewCSSBoresight=True,
-                                       showCSSLabels=True)
-    scSim.InitializeSimulation()
-    scSim.ConfigureStopTime(simulationTime)
-    scSim.SetProgressBar(True)
+    print("This is where vizard prints a 1:")
+    ret = vizSupport.setInstrumentGuiSetting(viz, viewCSSPanel=True,
+                                             viewCSSCoverage=True,
+                                             viewCSSBoresight=True,
+                                             showCSSLabels=True)
+    ret = scSim.InitializeSimulation()
+    ret = scSim.ConfigureStopTime(simulationTime)
+    ret = scSim.SetProgressBar(True)
 
     # Run the simulation
     t0 = time.time()
@@ -157,46 +203,57 @@ if __name__ == "__main__":
     vizard.kill()
 
     # Plot results
+    t = dataLog.times() * macros.NANO2SEC
     posData = dataLog.r_BN_N
     velData = dataLog.v_BN_N
     cssData = [cssl.OutputData for cssl in cssLogs]
+    tamData = tamLog.tam_S
+    magData = magLog.magField_N
+    print(earthLog.PositionVector)
     np.set_printoptions(precision=16)
     plt.close("all")  # clears out plots from earlier test runs
 
-    plt.figure(1)
-    fig = plt.gcf()
-    ax = fig.gca()
-    ax.ticklabel_format(useOffset=False, style='plain')
+    fig = plt.figure(figsize=(14, 10))
+    gs = fig.add_gridspec(2, 2)
+
+    ax1 = fig.add_subplot(gs[0, 0])
+    ax1.ticklabel_format(useOffset=False, style='plain')
     for idx in range(3):
-        plt.plot(dataLog.times() * macros.NANO2SEC, posData[:, idx] / 1000.,
+        ax1.plot(t, posData[:, idx] / 1000.,
                  color=unitTestSupport.getLineColor(idx, 3),
                  label='$r_{BN,' + str(idx) + '}$')
-    plt.legend(loc='lower right')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Inertial Position (km)')
+    ax1.legend(loc='lower right')
+    ax1.set_xlabel('Time (s)')
+    ax1.set_ylabel('Inertial Position (km)')
 
-    plt.figure(2)
-    fig = plt.gcf()
-    ax = fig.gca()
-    ax.ticklabel_format(useOffset=False, style='plain')
+    ax2 = fig.add_subplot(gs[0, 1])
+    ax2.ticklabel_format(useOffset=False, style='plain')
     smaData = []
     for idx in range(0, len(posData)):
         oeData = orbitalMotion.rv2elem(mu, posData[idx], velData[idx])
         smaData.append(oeData.a / 1000.)
-    plt.plot(posData[:, 0] * macros.NANO2SEC, smaData, color='#aa0000')
-    plt.xlabel('Time (s)')
-    plt.ylabel('SMA (km)')
+    ax2.plot(t, smaData, color='#aa0000')
+    ax2.set_xlabel('Time (s)')
+    ax2.set_ylabel('SMA (km)')
 
-    plt.figure(3)
-    fig = plt.gcf()
-    ax = fig.gca()
-    ax.ticklabel_format(useOffset=False, style='plain')
+    ax3 = fig.add_subplot(gs[1, 0])
+    ax3.ticklabel_format(useOffset=False, style='plain')
     for i, cssl in enumerate(cssLogs):
-        plt.plot(cssl.times() * macros.NANO2SEC, cssl.OutputData,
-                 label=f"CSS{i}")
-    plt.legend()
-    plt.xlabel('Time (s)')
-    plt.ylabel('CSS readings (mA)')
+        ax3.plot(t, cssl.OutputData, label=f"CSS{i}")
+    ax3.legend()
+    ax3.set_xlabel('Time (s)')
+    ax3.set_ylabel('CSS readings (mA)')
+
+    ax4 = fig.add_subplot(gs[1, 1])
+    ax4.ticklabel_format(useOffset=False, style='sci')
+    ax4.get_yaxis().set_major_formatter(plt.FuncFormatter(lambda x, loc: "{:,}".format(int(x))))
+    for idx in range(3):
+        ax4.plot(t, tamData[:, idx] * 1e9,
+                 color=unitTestSupport.getLineColor(idx, 3), 
+                 label=r'$TAM_{' + str(idx) + '}$')
+    ax4.legend(loc='lower right')
+    ax4.set_xlabel('Time (s)')
+    ax4.set_ylabel('Magnetic Field (nT)')
 
     plt.show()
     plt.close("all")

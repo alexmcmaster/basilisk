@@ -287,6 +287,7 @@ def run(show_plots, orbitCase, planetCase, useBias, useBounds):
     #   retrieve the logged data
     #
     magData = magLog.magField_N
+    print(magData)
     tamData = tamLog.tam_S
     posData = dataLog.r_BN_N
 
@@ -351,8 +352,8 @@ def run(show_plots, orbitCase, planetCase, useBias, useBounds):
 if __name__ == "__main__":
     run(
         True,          # show_plots (True, False)
-        'elliptical',  # orbit Case (circular, elliptical)
-        'Jupiter',    # planet Case (Earth, Jupiter)
+        'circular',  # orbit Case (circular, elliptical)
+        'Earth',    # planet Case (Earth, Jupiter)
         False,        # useBias
         False        # useBounds
     )
