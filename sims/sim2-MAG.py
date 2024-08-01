@@ -15,7 +15,7 @@ bskPath = __path__[0]
 fileName = os.path.basename(os.path.splitext(__file__)[0])
 
 from Basilisk.simulation import spacecraft, simSynch, coarseSunSensor,\
-    magnetometer, magneticFieldWMM, magneticFieldCenteredDipole
+    magnetometer, magneticFieldWMM, eclipse
 from Basilisk.utilities import SimulationBaseClass, macros,\
     orbitalMotion, simIncludeGravBody, unitTestSupport, vizSupport,\
     simSetPlanetEnvironment
@@ -29,7 +29,7 @@ TIME_STEP_S = 5
 ACCEL_FACTOR = 100.0
 SPICE_TIME = "2012 MAY 1 00:28:30.0 TDB"
 START_TIME = datetime(year=2012, month=5, day=1, hour=0, minute=28, second=30)
-NUM_ORBITS = 0.1
+NUM_ORBITS = 1
 
 
 if __name__ == "__main__":
@@ -59,27 +59,24 @@ if __name__ == "__main__":
     grav_factory.createSpiceInterface(bskPath + "/supportData/EphemerisData/",
         time=spice_time, epochInMsg=True)
     grav_factory.spiceObject.zeroBase = "Earth"
-    grav_factory.spiceObject.addPlanetNames(messaging.StringVector(["EARTH", "MOON", "SUN"]))
-    ret = grav_factory.spiceObject.loadSpiceKernel("de421.bsp", bskPath + "/supportData/EphemerisData/")
-    if ret:
-        print("Failed to load spice kernel")
+    planetStateOutMsgs = {
+        "earth": grav_factory.spiceObject.planetStateOutMsgs[0],
+        "moon": grav_factory.spiceObject.planetStateOutMsgs[1],
+        "sun": grav_factory.spiceObject.planetStateOutMsgs[2],
+    }
     scSim.AddModelToTask(simTaskName, grav_factory.spiceObject)
-    pyswice.furnsh_c(grav_factory.spiceObject.SPICEDataPath + 'de430.bsp')  # solar system bodies
-    pyswice.furnsh_c(grav_factory.spiceObject.SPICEDataPath + 'naif0012.tls')  # leap second file
-    pyswice.furnsh_c(grav_factory.spiceObject.SPICEDataPath + 'de-403-masses.tpc')  # solar system masses
-    pyswice.furnsh_c(grav_factory.spiceObject.SPICEDataPath + 'pck00010.tpc')  # generic Planetary Constants Kernel
 
     # Magnetic field model
-    #magModule = magneticFieldWMM.MagneticFieldWMM()
-    #magModule.ModelTag = "WMM"
-    #magModule.dataPath = bskPath + "/supportData/MagneticField/"
-    magModule = magneticFieldCenteredDipole.MagneticFieldCenteredDipole()
-    magModule.ModelTag = "CenteredDipole"
-    magModule.planetPosInMsg.subscribeTo(grav_factory.spiceObject.planetStateOutMsgs[0])
+    magModule = magneticFieldWMM.MagneticFieldWMM()
+    magModule.ModelTag = "WMM"
+    magModule.dataPath = bskPath + "/supportData/MagneticField/"
+    #magModule = magneticFieldCenteredDipole.MagneticFieldCenteredDipole()
+    #magModule.ModelTag = "CenteredDipole"
+    magModule.planetPosInMsg.subscribeTo(planetStateOutMsgs["earth"])
     epochMsg = unitTestSupport.timeStringToGregorianUTCMsg(
         START_TIME.strftime("%Y %b %d, %X (UTC)"))
     magModule.epochInMsg.subscribeTo(epochMsg)
-    simSetPlanetEnvironment.centeredDipoleMagField(magModule, "earth")
+    #simSetPlanetEnvironment.centeredDipoleMagField(magModule, "earth")
     magModule.addSpacecraftToModel(scObject.scStateOutMsg)
     scSim.AddModelToTask(simTaskName, magModule)
 
@@ -113,12 +110,12 @@ if __name__ == "__main__":
                                    [2.*macros.D2R],
                                    [3.*macros.D2R]]  # angular rates (rad/s)
 
-    sunPositionMsgData = messaging.SpicePlanetStateMsgPayload()
-    sunPositionMsgData.PositionVector = [0.0, orbitalMotion.AU*1000.0, 0.0]
-    sunPositionMsg = messaging.SpicePlanetStateMsg().write(sunPositionMsgData)
-    eclipseMsgData = messaging.EclipseMsgPayload()
-    eclipseMsgData.shadowFactor = 0.5
-    eclipseMsg = messaging.EclipseMsg().write(eclipseMsgData)
+    # Eclipse model
+    eclipseObject = eclipse.Eclipse()
+    eclipseObject.addSpacecraftToModel(scObject.scStateOutMsg)
+    eclipseObject.addPlanetToModel(planetStateOutMsgs["earth"])
+    eclipseObject.sunInMsg.subscribeTo(planetStateOutMsgs["sun"])
+    scSim.AddModelToTask(simTaskName, eclipseObject)
 
     # Define CSS units. Parameters common to all are hardcoded, while parameters
     # that differ between units are given as parameters.
@@ -130,9 +127,9 @@ if __name__ == "__main__":
         CSS.kellyFactor = 0.1
         CSS.senBias = 0.0  # normalized sensor bias
         CSS.senNoiseStd = 0.01  # normalized sensor noise
-        CSS.sunInMsg.subscribeTo(sunPositionMsg)
+        CSS.sunInMsg.subscribeTo(planetStateOutMsgs["sun"])
         CSS.stateInMsg.subscribeTo(scObject.scStateOutMsg)
-        CSS.sunEclipseInMsg.subscribeTo(eclipseMsg)
+        CSS.sunEclipseInMsg.subscribeTo(eclipseObject.eclipseOutMsgs[0])
         CSS.ModelTag = tag
         CSS.r_B = np.array(pos)
         CSS.nHat_B = np.array(direction)
@@ -172,7 +169,6 @@ if __name__ == "__main__":
     cssLogs = [css.cssDataOutMsg.recorder(samplingTime) for css in cssList]
     tamLog = TAM.tamDataOutMsg.recorder(samplingTime)
     magLog = magModule.envOutMsgs[0].recorder(samplingTime)
-    earthLog = grav_factory.spiceObject.planetStateOutMsgs[0].recorder(samplingTime)
     scSim.AddModelToTask(simTaskName, dataLog)
     for cssl in cssLogs:
         scSim.AddModelToTask(simTaskName, cssl)
@@ -209,7 +205,6 @@ if __name__ == "__main__":
     cssData = [cssl.OutputData for cssl in cssLogs]
     tamData = tamLog.tam_S
     magData = magLog.magField_N
-    print(earthLog.PositionVector)
     np.set_printoptions(precision=16)
     plt.close("all")  # clears out plots from earlier test runs
 
