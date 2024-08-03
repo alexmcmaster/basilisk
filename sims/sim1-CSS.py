@@ -4,6 +4,7 @@ Simulation of an uncontrolled spacecraft in LEO.
 
 import os
 import time
+from datetime import datetime
 import subprocess
 
 import matplotlib.pyplot as plt
@@ -13,14 +14,17 @@ from Basilisk import __path__
 bskPath = __path__[0]
 fileName = os.path.basename(os.path.splitext(__file__)[0])
 
-from Basilisk.simulation import spacecraft, coarseSunSensor
+from Basilisk.simulation import spacecraft, simSynch, coarseSunSensor,\
+    eclipse
 from Basilisk.utilities import SimulationBaseClass, macros,\
     orbitalMotion, simIncludeGravBody, unitTestSupport, vizSupport
-from Basilisk.simulation import simSynch
 from Basilisk.architecture import messaging
 
 
 TIME_STEP_S = 0.05
+ACCEL_FACTOR = 1.0
+START_TIME = datetime(year=2012, month=5, day=1, hour=0, minute=28, second=30)
+NUM_ORBITS = 0.01
 
 
 if __name__ == "__main__":
@@ -39,18 +43,23 @@ if __name__ == "__main__":
     scSim.AddModelToTask(simTaskName, scObject)
 
     # Gravity setup
-    grav_factory = simIncludeGravBody.gravBodyFactory()
-    grav_bodies = grav_factory.createBodies("earth", "moon", "sun")
+    gravFactory = simIncludeGravBody.gravBodyFactory()
+    grav_bodies = gravFactory.createBodies("earth", "moon", "sun")
     grav_bodies["earth"].isCentralBody = True
     grav_bodies["earth"].useSphericalHarmonicsGravityModel(bskPath + "/supportData/LocalGravData/GGM03S.txt", 10)
     mu_earth = grav_bodies["earth"].mu
     mu = mu_earth
-    grav_factory.addBodiesTo(scObject)
-    spice_object = grav_factory.createSpiceInterface(time="2012 MAY 1 00:28:30.0 TDB", epochInMsg=True)
-    spice_object.zeroBase = "Earth"
-    spice_object.addPlanetNames(messaging.StringVector(["EARTH", "MOON", "SUN"]))
-    spice_object.loadSpiceKernel("de421.bsp", bskPath + "/supportData/EphemerisData/")
-    scSim.AddModelToTask(simTaskName, spice_object)
+    gravFactory.addBodiesTo(scObject)
+    spice_time = START_TIME.strftime("%Y %b %d %X TDB")
+    gravFactory.createSpiceInterface(bskPath + "/supportData/EphemerisData/",
+        time=spice_time, epochInMsg=True)
+    gravFactory.spiceObject.zeroBase = "Earth"
+    planetStateOutMsgs = {
+        "earth": gravFactory.spiceObject.planetStateOutMsgs[0],
+        "moon": gravFactory.spiceObject.planetStateOutMsgs[1],
+        "sun": gravFactory.spiceObject.planetStateOutMsgs[2],
+    }
+    scSim.AddModelToTask(simTaskName, gravFactory.spiceObject)
 
     # Spacecraft setup
     I = [900., 0., 0.,
@@ -72,7 +81,7 @@ if __name__ == "__main__":
     oe = orbitalMotion.rv2elem(mu, rN, vN)
     n = np.sqrt(mu / oe.a / oe.a / oe.a)
     P = 2. * np.pi / n
-    simulationTime = macros.sec2nano(P/100)  # Run for 1/100 of an orbit
+    simulationTime = macros.sec2nano(P * NUM_ORBITS)
 
     # Initial spacecraft states/rates
     scObject.hub.r_CN_NInit = rN  # position vector (m)
@@ -82,12 +91,12 @@ if __name__ == "__main__":
                                    [2.*macros.D2R],
                                    [3.*macros.D2R]]  # angular rates (rad/s)
 
-    sunPositionMsgData = messaging.SpicePlanetStateMsgPayload()
-    sunPositionMsgData.PositionVector = [0.0, orbitalMotion.AU*1000.0, 0.0]
-    sunPositionMsg = messaging.SpicePlanetStateMsg().write(sunPositionMsgData)
-    eclipseMsgData = messaging.EclipseMsgPayload()
-    eclipseMsgData.shadowFactor = 0.5
-    eclipseMsg = messaging.EclipseMsg().write(eclipseMsgData)
+    # Eclipse model
+    eclipseObject = eclipse.Eclipse()
+    eclipseObject.addSpacecraftToModel(scObject.scStateOutMsg)
+    eclipseObject.addPlanetToModel(planetStateOutMsgs["earth"])
+    eclipseObject.sunInMsg.subscribeTo(planetStateOutMsgs["sun"])
+    scSim.AddModelToTask(simTaskName, eclipseObject)
 
     # Define CSS units. Parameters common to all are hardcoded, while parameters
     # that differ between units are given as parameters.
@@ -99,9 +108,9 @@ if __name__ == "__main__":
         CSS.kellyFactor = 0.1
         CSS.senBias = 0.0  # normalized sensor bias
         CSS.senNoiseStd = 0.01  # normalized sensor noise
-        CSS.sunInMsg.subscribeTo(sunPositionMsg)
+        CSS.sunInMsg.subscribeTo(planetStateOutMsgs["sun"])
         CSS.stateInMsg.subscribeTo(scObject.scStateOutMsg)
-        CSS.sunEclipseInMsg.subscribeTo(eclipseMsg)
+        CSS.sunEclipseInMsg.subscribeTo(eclipseObject.eclipseOutMsgs[0])
         CSS.ModelTag = tag
         CSS.r_B = np.array(pos)
         CSS.nHat_B = np.array(direction)
@@ -137,11 +146,12 @@ if __name__ == "__main__":
 
     # Final setup
     clockSync = simSynch.ClockSynch()
-    clockSync.accelFactor = 1.0
+    clockSync.accelFactor = ACCEL_FACTOR
     scSim.AddModelToTask(simTaskName, clockSync)
     viz = vizSupport.enableUnityVisualization(scSim, simTaskName, scObject,
                                               liveStream=True,
                                               cssList=[cssList])
+    print("This is where vizard prints a 1:")
     vizSupport.setInstrumentGuiSetting(viz, viewCSSPanel=True,
                                        viewCSSCoverage=True,
                                        viewCSSBoresight=True,

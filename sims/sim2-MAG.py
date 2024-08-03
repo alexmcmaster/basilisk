@@ -15,7 +15,7 @@ bskPath = __path__[0]
 fileName = os.path.basename(os.path.splitext(__file__)[0])
 
 from Basilisk.simulation import spacecraft, simSynch, coarseSunSensor,\
-    magnetometer, magneticFieldWMM, eclipse
+    eclipse, magnetometer, magneticFieldWMM
 from Basilisk.utilities import SimulationBaseClass, macros,\
     orbitalMotion, simIncludeGravBody, unitTestSupport, vizSupport,\
     simSetPlanetEnvironment
@@ -27,7 +27,6 @@ from Basilisk.utilities.pyswice_spk_utilities import spkRead
 
 TIME_STEP_S = 0.05
 ACCEL_FACTOR = 1.0
-SPICE_TIME = "2012 MAY 1 00:28:30.0 TDB"
 START_TIME = datetime(year=2012, month=5, day=1, hour=0, minute=28, second=30)
 NUM_ORBITS = 0.01
 
@@ -48,23 +47,23 @@ if __name__ == "__main__":
     scSim.AddModelToTask(simTaskName, scObject)
 
     # Gravity setup
-    grav_factory = simIncludeGravBody.gravBodyFactory()
-    grav_bodies = grav_factory.createBodies("earth", "moon", "sun")
+    gravFactory = simIncludeGravBody.gravBodyFactory()
+    grav_bodies = gravFactory.createBodies("earth", "moon", "sun")
     grav_bodies["earth"].isCentralBody = True
     grav_bodies["earth"].useSphericalHarmonicsGravityModel(bskPath + "/supportData/LocalGravData/GGM03S.txt", 10)
     mu_earth = grav_bodies["earth"].mu
     mu = mu_earth
-    grav_factory.addBodiesTo(scObject)
+    gravFactory.addBodiesTo(scObject)
     spice_time = START_TIME.strftime("%Y %b %d %X TDB")
-    grav_factory.createSpiceInterface(bskPath + "/supportData/EphemerisData/",
+    gravFactory.createSpiceInterface(bskPath + "/supportData/EphemerisData/",
         time=spice_time, epochInMsg=True)
-    grav_factory.spiceObject.zeroBase = "Earth"
+    gravFactory.spiceObject.zeroBase = "Earth"
     planetStateOutMsgs = {
-        "earth": grav_factory.spiceObject.planetStateOutMsgs[0],
-        "moon": grav_factory.spiceObject.planetStateOutMsgs[1],
-        "sun": grav_factory.spiceObject.planetStateOutMsgs[2],
+        "earth": gravFactory.spiceObject.planetStateOutMsgs[0],
+        "moon": gravFactory.spiceObject.planetStateOutMsgs[1],
+        "sun": gravFactory.spiceObject.planetStateOutMsgs[2],
     }
-    scSim.AddModelToTask(simTaskName, grav_factory.spiceObject)
+    scSim.AddModelToTask(simTaskName, gravFactory.spiceObject)
 
     # Magnetic field model
     magModule = magneticFieldWMM.MagneticFieldWMM()
@@ -181,13 +180,13 @@ if __name__ == "__main__":
                                               liveStream=True,
                                               cssList=[cssList])
     print("This is where vizard prints a 1:")
-    ret = vizSupport.setInstrumentGuiSetting(viz, viewCSSPanel=True,
-                                             viewCSSCoverage=True,
-                                             viewCSSBoresight=True,
-                                             showCSSLabels=True)
-    ret = scSim.InitializeSimulation()
-    ret = scSim.ConfigureStopTime(simulationTime)
-    ret = scSim.SetProgressBar(True)
+    vizSupport.setInstrumentGuiSetting(viz, viewCSSPanel=True,
+                                       viewCSSCoverage=True,
+                                       viewCSSBoresight=True,
+                                       showCSSLabels=True)
+    scSim.InitializeSimulation()
+    scSim.ConfigureStopTime(simulationTime)
+    scSim.SetProgressBar(True)
 
     # Run the simulation
     t0 = time.time()

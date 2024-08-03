@@ -4,6 +4,7 @@ Simulation of an uncontrolled spacecraft in LEO.
 
 import os
 import time
+from datetime import datetime
 import subprocess
 
 import matplotlib.pyplot as plt
@@ -21,6 +22,9 @@ from Basilisk.architecture import messaging
 
 
 TIME_STEP_S = 0.05
+ACCEL_FACTOR = 1.0
+START_TIME = datetime(year=2012, month=5, day=1, hour=0, minute=28, second=30)
+NUM_ORBITS = 0.01
 
 
 if __name__ == "__main__":
@@ -39,18 +43,23 @@ if __name__ == "__main__":
     scSim.AddModelToTask(simTaskName, scObject)
 
     # Gravity setup
-    grav_factory = simIncludeGravBody.gravBodyFactory()
-    grav_bodies = grav_factory.createBodies("earth", "moon", "sun")
+    gravFactory = simIncludeGravBody.gravBodyFactory()
+    grav_bodies = gravFactory.createBodies("earth", "moon", "sun")
     grav_bodies["earth"].isCentralBody = True
     grav_bodies["earth"].useSphericalHarmonicsGravityModel(bskPath + "/supportData/LocalGravData/GGM03S.txt", 10)
     mu_earth = grav_bodies["earth"].mu
     mu = mu_earth
-    grav_factory.addBodiesTo(scObject)
-    spice_object = grav_factory.createSpiceInterface(time="2012 MAY 1 00:28:30.0 TDB", epochInMsg=True)
-    spice_object.zeroBase = "Earth"
-    spice_object.addPlanetNames(messaging.StringVector(["EARTH", "MOON", "SUN"]))
-    spice_object.loadSpiceKernel("de421.bsp", bskPath + "/supportData/EphemerisData/")
-    scSim.AddModelToTask(simTaskName, spice_object)
+    gravFactory.addBodiesTo(scObject)
+    spice_time = START_TIME.strftime("%Y %b %d %X TDB")
+    gravFactory.createSpiceInterface(bskPath + "/supportData/EphemerisData/",
+        time=spice_time, epochInMsg=True)
+    gravFactory.spiceObject.zeroBase = "Earth"
+    planetStateOutMsgs = {
+        "earth": gravFactory.spiceObject.planetStateOutMsgs[0],
+        "moon": gravFactory.spiceObject.planetStateOutMsgs[1],
+        "sun": gravFactory.spiceObject.planetStateOutMsgs[2],
+    }
+    scSim.AddModelToTask(simTaskName, gravFactory.spiceObject)
 
     # Initial conditions
     oe = orbitalMotion.ClassicElements()
@@ -66,7 +75,7 @@ if __name__ == "__main__":
     scObject.hub.v_CN_NInit = vN  # meters per second
     n = np.sqrt(mu / oe.a / oe.a / oe.a)
     P = 2. * np.pi / n
-    simulationTime = macros.sec2nano(P/100)  # Run for 1/100 of an orbit
+    simulationTime = macros.sec2nano(P * NUM_ORBITS)
 
     # Logging
     numDataPoints = 400
@@ -78,7 +87,7 @@ if __name__ == "__main__":
 
     # Final setup
     clockSync = simSynch.ClockSynch()
-    clockSync.accelFactor = 1.0
+    clockSync.accelFactor = ACCEL_FACTOR
     scSim.AddModelToTask(simTaskName, clockSync)
     vizSupport.enableUnityVisualization(scSim, simTaskName, scObject,
                                         liveStream=True)
