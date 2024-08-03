@@ -25,11 +25,11 @@ from Basilisk.topLevelModules import pyswice
 from Basilisk.utilities.pyswice_spk_utilities import spkRead
 
 
-TIME_STEP_S = 5
-ACCEL_FACTOR = 100.0
+TIME_STEP_S = 0.05
+ACCEL_FACTOR = 1.0
 SPICE_TIME = "2012 MAY 1 00:28:30.0 TDB"
 START_TIME = datetime(year=2012, month=5, day=1, hour=0, minute=28, second=30)
-NUM_ORBITS = 1
+NUM_ORBITS = 0.01
 
 
 if __name__ == "__main__":
@@ -70,13 +70,10 @@ if __name__ == "__main__":
     magModule = magneticFieldWMM.MagneticFieldWMM()
     magModule.ModelTag = "WMM"
     magModule.dataPath = bskPath + "/supportData/MagneticField/"
-    #magModule = magneticFieldCenteredDipole.MagneticFieldCenteredDipole()
-    #magModule.ModelTag = "CenteredDipole"
     magModule.planetPosInMsg.subscribeTo(planetStateOutMsgs["earth"])
     epochMsg = unitTestSupport.timeStringToGregorianUTCMsg(
         START_TIME.strftime("%Y %b %d, %X (UTC)"))
     magModule.epochInMsg.subscribeTo(epochMsg)
-    #simSetPlanetEnvironment.centeredDipoleMagField(magModule, "earth")
     magModule.addSpacecraftToModel(scObject.scStateOutMsg)
     scSim.AddModelToTask(simTaskName, magModule)
 
