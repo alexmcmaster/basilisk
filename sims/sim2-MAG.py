@@ -152,7 +152,7 @@ if __name__ == "__main__":
     TAM = magnetometer.Magnetometer()
     TAM.ModelTag = "TAM_sensor"
     TAM.scaleFactor = 1.0
-    #TAM.senNoiseStd = [100e-9, 100e-9, 100e-9]
+    TAM.senNoiseStd = [100e-9, 100e-9, 100e-9]
     TAM.stateInMsg.subscribeTo(scObject.scStateOutMsg)
     scSim.AddModelToTask(simTaskName, TAM)
 
