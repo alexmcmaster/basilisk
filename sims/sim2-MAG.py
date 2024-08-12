@@ -216,6 +216,7 @@ if __name__ == "__main__":
     ax1.legend(loc='lower right')
     ax1.set_xlabel('Time (s)')
     ax1.set_ylabel('Inertial Position (km)')
+    ax1.set_title("Inertial Position")
 
     ax2 = fig.add_subplot(gs[0, 1])
     ax2.ticklabel_format(useOffset=False, style='plain')
@@ -226,6 +227,7 @@ if __name__ == "__main__":
     ax2.plot(t, smaData, color='#aa0000')
     ax2.set_xlabel('Time (s)')
     ax2.set_ylabel('SMA (km)')
+    ax2.set_title("Semimajor Axis")
 
     ax3 = fig.add_subplot(gs[1, 0])
     ax3.ticklabel_format(useOffset=False, style='plain')
@@ -234,6 +236,7 @@ if __name__ == "__main__":
     ax3.legend()
     ax3.set_xlabel('Time (s)')
     ax3.set_ylabel('CSS readings (mA)')
+    ax3.set_title("Coarse Sun Sensors")
 
     ax4 = fig.add_subplot(gs[1, 1])
     ax4.ticklabel_format(useOffset=False, style='sci')
@@ -245,6 +248,7 @@ if __name__ == "__main__":
     ax4.legend(loc='lower right')
     ax4.set_xlabel('Time (s)')
     ax4.set_ylabel('Magnetic Field (nT)')
+    ax4.set_title("Magnetometer")
 
     plt.show()
     plt.close("all")
