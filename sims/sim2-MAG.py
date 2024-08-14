@@ -1,5 +1,5 @@
 """
-Simulation of an uncontrolled spacecraft in LEO.
+Simulation of an uncontrolled spacecraft with 6x CSS and a magnetometer in LEO.
 """
 
 import os
