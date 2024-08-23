@@ -245,8 +245,8 @@ if __name__ == "__main__":
     np.set_printoptions(precision=16)
     plt.close("all")  # clears out plots from earlier test runs
 
-    fig = plt.figure(figsize=(21, 10))
-    gs = fig.add_gridspec(3, 2)
+    fig = plt.figure(figsize=(8, 18))
+    gs = fig.add_gridspec(6, 1)
 
     ax1 = fig.add_subplot(gs[0, 0])
     ax1.ticklabel_format(useOffset=False, style='plain')
@@ -259,7 +259,7 @@ if __name__ == "__main__":
     ax1.set_ylabel('Inertial Position (km)')
     ax1.set_title("Inertial Position")
 
-    ax2 = fig.add_subplot(gs[0, 1])
+    ax2 = fig.add_subplot(gs[1, 0])
     ax2.ticklabel_format(useOffset=False, style='plain')
     smaData = []
     for idx in range(0, len(posData)):
@@ -270,7 +270,7 @@ if __name__ == "__main__":
     ax2.set_ylabel('SMA (km)')
     ax2.set_title("Semimajor Axis")
 
-    ax3 = fig.add_subplot(gs[1, 0])
+    ax3 = fig.add_subplot(gs[2, 0])
     ax3.ticklabel_format(useOffset=False, style='plain')
     for i, orientation in enumerate(cssOrientations):
         ax3.plot(t, cssData[:, i], label=f"CSS{i} ({orientation})")
@@ -279,7 +279,7 @@ if __name__ == "__main__":
     ax3.set_ylabel('CSS readings (mA)')
     ax3.set_title("Coarse Sun Sensors")
 
-    ax4 = fig.add_subplot(gs[1, 1])
+    ax4 = fig.add_subplot(gs[3, 0])
     ax4.ticklabel_format(useOffset=False, style='sci')
     ax4.get_yaxis().set_major_formatter(plt.FuncFormatter(lambda x, loc: "{:,}".format(int(x))))
     for idx in range(3):
@@ -291,7 +291,7 @@ if __name__ == "__main__":
     ax4.set_ylabel('Magnetic Field (nT)')
     ax4.set_title("Magnetometer")
 
-    ax5 = fig.add_subplot(gs[2, 0])
+    ax5 = fig.add_subplot(gs[4, 0])
     ax5.ticklabel_format(useOffset=False, style="plain")
     x = filtLog.state[:,0]
     y = filtLog.state[:,1]
@@ -310,7 +310,7 @@ if __name__ == "__main__":
     ax5.set_ylabel("Sun Vector")
     ax5.set_title("Sun Vector Estimate")
 
-    ax6 = fig.add_subplot(gs[2, 1])
+    ax6 = fig.add_subplot(gs[5, 0])
     ax6.ticklabel_format(useOffset=False, style="plain")
     x = filtLog.stateError[:,0]
     y = filtLog.stateError[:,1]
